@@ -1,25 +1,16 @@
-[![Crates.io](https://img.shields.io/crates/d/fmlrc.svg)](https://crates.io/crates/fmlrc)
-[![Crates.io](https://img.shields.io/crates/v/fmlrc.svg)](https://crates.io/crates/fmlrc)
-[![Crates.io](https://img.shields.io/crates/l/fmlrc.svg)](https://crates.io/crates/fmlrc)
-[![Build status](https://github.com/HudsonAlpha/fmlrc2/actions/workflows/quickstart-ci.yml/badge.svg)](https://github.com/HudsonAlpha/fmlrc2/actions)
-
 # FMLRC2
 
+FMLRC2 performs error correction/polishing of long erroneous sequences with accurate short reads. As such, it can be used as *both* an error-correction tool \[[1](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-018-2051-3)\] for raw long reads (ex. Oxford Nanopore) *and* a polishing tool \[[2](http://biorxiv.org/content/early/2022/07/23/2022.07.22.501182)\] for *de novo* assemblies.
+
 This repo contains the source code for FMLRC v2, based on the same methodology used by the original [FMLRC](https://github.com/holtjma/fmlrc).  In benchmarks, the results between FMLRC v1 and v2 are nearly identical, but tests have shown that v2 uses approximately 50% of the run and CPU time compared to v1.
+
 
 ## Installation
 All installation options assume you have installed [Rust](https://www.rust-lang.org) along with the `cargo` crate manager for Rust.
 
-### From Cargo
-```bash
-cargo install fmlrc
-fmlrc2 -h
-fmlrc2-convert -h
-```
-
 ### From GitHub
 ```bash 
-git clone https://github.com/HudsonAlpha/fmlrc2.git
+git clone https://github.com/jwanglab/fmlrc2.git
 cd fmlrc2
 #testing optional, some tests will fail if ropebwt2 is not installed or cannot be found on PATH
 cargo test --release
@@ -43,22 +34,25 @@ Note that this command requires the [ropebwt2](https://github.com/lh3/ropebwt2) 
 ```
 gunzip -c reads.fq.gz [reads2.fq.gz ...] | \
     awk 'NR % 4 == 2' | \
-    sort | \
     tr NT TN | \
     ropebwt2 -LR | \
     tr NT TN | \
     fmlrc2-convert comp_msbwt.npy
 ```
 
-Note: If you are **only** using the BWT for correction, then the `sort` can be removed from the above command. This will reduce construction time significantly, but loses the read recovery property of the BWT.
-
-### Correction
-Assuming the accurate-read BWT is built (`comp_msbwt.npy`) and uncorrected reads are available (fasta/fastq, gzip optional, `uncorrected.fq.gz`), invoking FMLRC v2 is fairly simple:
+### Read Error Correction
+Assuming the accurate-read BWT is built (`comp_msbwt.npy`) and uncorrected reads are available (fasta/fastq, gzip optional, `uncorrected.fq.gz`), FMLRC2 can be run as follows:
 ```
 fmlrc2 [OPTIONS] <comp_msbwt.npy> <uncorrected.fq.gz> <corrected_reads.fa>
 ```
 
-Currently, only uncompressed FASTA is supported for output reads.
+### Genome Assembly Polishing
+Assuming the accurate-read BWT is built (`comp_msbwt.npy`) and unpolished assembly are available (fasta/fastq, gzip optional, `assembly.fa`), FMLRC2 can be run as follows:
+```
+fmlrc2 [OPTIONS] <comp_msbwt.npy> <assembly.fa> <polished_assembly.fa>
+```
+
+For bacterial and other short, minimally repetitive genomes, the default parameters typically produce optimal results. For polishing more complex eukaryotic genomes, adding options `--k 21 59 80, --min_frac 0` usually improves polishing accuracy, particularly in repetitive elements, with a modest increase in run time (~10%).
 
 #### Options to consider
 1. `-h` - see full list of options and exit
@@ -73,27 +67,6 @@ Currently, only uncompressed FASTA is supported for output reads.
 4. Input handling - thanks to [needletail](https://crates.io/crates/needletail), the uncorrected reads can be in FASTA/FASTQ and may or may not be gzip compressed.
 5. Unit testing - FMLRC v2 has unit testing through the standard Rust testing framework (i.e. `cargo test`)
 
-## Benchmarks
-Thus far, all benchmarks have focused on a relatively small _E. coli_ dataset for verifying correctness.
-The files for this dataset can be found in the original [fmlrc example](https://github.com/holtjma/fmlrc/blob/master/example/run_example.sh).
-The exact same BWT and uncorrected long read files were used for both fmlrc v1 and fmlrc v2.
-[ELECTOR](https://github.com/kamimrcht/ELECTOR) was used to evaluate the results.
-All fmlrc executions were run on a Macbook Pro with Apple M1 Pro processor (8 threads/processes used) with 16 GB of RAM.
-Run times were gathered using Mac OSX `time`.
-All parameters were set to defaults except for `-C 10` in FMLRC v2.
-
-The following table summarizes the results. 
-The actual corrections are _nearly_ identical (there are slight differences not reflected in summary metrics).
-However, FMLRC v2 runs in less than half the time from both real time and CPU time perspectives. 
-While not explicitly measured, FMLRC v2 does use ~1GB of extra memory due to the 10-mer cache (`-C 10`).
-
-| Metric | FMLRC v1.0.0 | FMLRC2 v0.1.6 (`-C 10`) | FMLRC2 v0.1.7 (`-C 10`) |
-| - | - | - | - |
-| Recall | 0.9830 | 0.9830 | 0.9830 |
-| Precision | 0.9821 | 0.9821 | 0.9821 |
-| Real time | 3m38.067s | 1m24.219s | **1m14.720s** |
-| CPU time | 27m23.652s | 8m49.680s | **8m15.823s** |
-
 ## FAQ
 ### How do I set multiple, custom k-mer sizes?
 K-mer sizes are set via the `-k`/`-K` parameter.
@@ -103,8 +76,10 @@ The following is an example of how you would add a third filtering step with `k=
 fmlrc2 -k 21 59 79 -- <comp_msbwt.npy> <uncorrected.fq.gz> <corrected_reads.fa>
 ```
 
-## Reference
-FMLRC v2 does not currently have a pre-print or paper. If you use FMLRC v2, please cite the FMLRC v1 paper:
+## Publications
+A detailed description of the algorithm, performance compared to other error correction and genome polishing tools, and run time/resource usage benchmarks are available in the relevant publications:
+
+[Qing Charles Mak, Ryan R Wick, James Matthew Holt and Jeremy R Wang. Polishing *de novo* nanopore assemblies of bacteria and eukaryotes with FMLRC2. biorxiv, 2022.](http://biorxiv.org/content/early/2022/07/23/2022.07.22.501182)
 
 [Wang, Jeremy R. and Holt, James and McMillan, Leonard and Jones, Corbin D. FMLRC: Hybrid long read error correction using an FM-index. BMC Bioinformatics, 2018. 19 (1) 50.](https://bmcbioinformatics.biomedcentral.com/articles/10.1186/s12859-018-2051-3)
 
