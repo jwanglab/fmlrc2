@@ -4,6 +4,8 @@ FMLRC2 performs error correction/polishing of long erroneous sequences with accu
 
 This repo contains the source code for FMLRC v2, based on the same methodology used by the original [FMLRC](https://github.com/holtjma/fmlrc).  In benchmarks, the results between FMLRC v1 and v2 are nearly identical, but tests have shown that v2 uses approximately 50% of the run and CPU time compared to v1.
 
+Try the [Polishing Tutorial](https://github.com/jwanglab/fmlrc2/polishing_tutorial) for full step-by-step instructions for assembling and polishing a bacterial genome!
+
 
 ## Installation
 All installation options assume you have installed [Rust](https://www.rust-lang.org) along with the `cargo` crate manager for Rust.
